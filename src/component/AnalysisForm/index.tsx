@@ -2,13 +2,24 @@
 
 import React, { useState, useRef } from "react";
 import { GenericCard } from "@/component/GenericCard";
-import { Mail, Upload, FileText, X, Sparkles, CheckCircle } from "lucide-react";
+import {
+  Mail,
+  Upload,
+  FileText,
+  X,
+  Sparkles,
+  CheckCircle,
+  Loader2,
+} from "lucide-react";
 
 export function AnalysisForm() {
   const [activeTab, setActiveTab] = useState<"email" | "file">("email");
   const [email, setEmail] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -47,6 +58,67 @@ export function AnalysisForm() {
   const clearFile = () => {
     setFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    setResult(null);
+  };
+
+  const handleAnalyze = async () => {
+    let contentToSend = "";
+    setResult(null);
+
+    if (activeTab === "email") {
+      if (!email.trim()) {
+        alert("Por favor, insira o conteúdo do email.");
+        return;
+      }
+      contentToSend = email;
+    } else {
+      if (!file) {
+        alert("Por favor, selecione um arquivo.");
+        return;
+      }
+      try {
+        if (file.type === "text/plain") {
+          contentToSend = await file.text();
+        } else {
+          alert(
+            "Nesta versão, a leitura automática funciona apenas para .txt. Para PDF, seria necessário um parser extra."
+          );
+          return;
+        }
+      } catch (error) {
+        alert("Erro ao ler o arquivo.");
+        return;
+      }
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("http://localhost:5000/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email_content: contentToSend,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro na requisição");
+      }
+
+      setResult(data);
+    } catch (error) {
+      console.error(error);
+      alert(
+        "Não foi possível conectar ao servidor. Verifique se o backend está rodando."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -60,31 +132,23 @@ export function AnalysisForm() {
         <div className="flex p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg self-start">
           <button
             onClick={() => setActiveTab("email")}
-            className={`
-              flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all
-              ${
-                activeTab === "email"
-                  ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-              }
-            `}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === "email"
+                ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100"
+                : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+            }`}
           >
-            <Mail size={16} />
-            Via Email
+            <Mail size={16} /> Via Email
           </button>
           <button
             onClick={() => setActiveTab("file")}
-            className={`
-              flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all
-              ${
-                activeTab === "file"
-                  ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-              }
-            `}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === "file"
+                ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100"
+                : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+            }`}
           >
-            <Upload size={16} />
-            Via Arquivo
+            <Upload size={16} /> Via Arquivo
           </button>
         </div>
 
@@ -113,14 +177,11 @@ export function AnalysisForm() {
                   onDragLeave={onDragLeave}
                   onDrop={onDrop}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`
-                    border-2 border-dashed rounded-xl h-32 flex flex-col items-center justify-center cursor-pointer transition-colors
-                    ${
-                      isDragging
-                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
-                        : "border-zinc-300 dark:border-zinc-700 hover:border-indigo-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                    }
-                  `}
+                  className={`border-2 border-dashed rounded-xl h-32 flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                    isDragging
+                      ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
+                      : "border-zinc-300 dark:border-zinc-700 hover:border-indigo-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                  }`}
                 >
                   <input
                     type="file"
@@ -166,10 +227,46 @@ export function AnalysisForm() {
           )}
         </div>
 
+        {result && (
+          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 animate-in fade-in zoom-in duration-300">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Resultado da Análise:
+            </h3>
+            <div className="space-y-2 text-sm">
+              <p>
+                <span className="font-medium">Categoria:</span>{" "}
+                {result.category}
+              </p>
+              <p>
+                <span className="font-medium">Confiança:</span>{" "}
+                {(result.confidence * 100).toFixed(1)}%
+              </p>
+              {result.suggested_response && (
+                <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                  <p className="font-medium mb-1 text-xs text-gray-500 uppercase">
+                    Sugestão de Resposta:
+                  </p>
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    {result.suggested_response}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
-          <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2">
-            <CheckCircle size={16} />
-            Iniciar Análise
+          <button
+            onClick={handleAnalyze}
+            disabled={isLoading}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+          >
+            {isLoading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <CheckCircle size={16} />
+            )}
+            {isLoading ? "Analisando..." : "Iniciar Análise"}
           </button>
         </div>
       </div>
