@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 export function AnalysisForm() {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
   const [activeTab, setActiveTab] = useState<"email" | "file">("email");
   const [email, setEmail] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -81,7 +82,7 @@ export function AnalysisForm() {
           contentToSend = await file.text();
         } else {
           alert(
-            "Nesta versão, a leitura automática funciona apenas para .txt. Para PDF, seria necessário um parser extra."
+            "Nesta versão, a leitura automática funciona apenas para .txt. Para PDF, seria necessário um parser extra.",
           );
           return;
         }
@@ -94,7 +95,7 @@ export function AnalysisForm() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/analyze", {
+      const response = await fetch(`${API_URL}/api/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -114,7 +115,7 @@ export function AnalysisForm() {
     } catch (error) {
       console.error(error);
       alert(
-        "Não foi possível conectar ao servidor. Verifique se o backend está rodando."
+        "Não foi possível conectar ao servidor. Verifique se o backend está rodando.",
       );
     } finally {
       setIsLoading(false);
